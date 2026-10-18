@@ -16,7 +16,11 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { SearchableSetting } from './SearchableSetting'
-import { collectZcodeUsageWindows, ZcodeUsageWindowView } from './zcode-plan-usage-windows'
+import {
+  collectProviderUsageWindows,
+  ProviderUsageWindowView,
+  type ProviderUsageWindowLabels
+} from './provider-usage-windows'
 import { useZcodePlanCredentials } from './use-zcode-plan-credentials'
 import { ZcodeCliSetupSection } from './ZcodeCliSetupSection'
 import { UnsealedCredentialNotice } from './UnsealedCredentialNotice'
@@ -41,6 +45,12 @@ function siteLabel(site: ZcodePlanSite): string {
     )
   }
   return translate('auto.components.settings.ZcodePlanAccountsSection.site.zai', 'Z.AI (z.ai)')
+}
+
+const WINDOW_LABELS: ProviderUsageWindowLabels = {
+  session: translate('auto.components.settings.ZcodePlanAccountsSection.window.session', '5 hours'),
+  weekly: translate('auto.components.settings.ZcodePlanAccountsSection.window.weekly', 'Weekly'),
+  monthly: translate('auto.components.settings.ZcodePlanAccountsSection.window.mcp', 'MCP monthly')
 }
 
 export function ZcodePlanAccountsSection(): React.JSX.Element {
@@ -77,7 +87,7 @@ export function ZcodePlanAccountsSection(): React.JSX.Element {
   }
 
   const usage = zcodeUsage ?? null
-  const usageWindows = collectZcodeUsageWindows(usage)
+  const usageWindows = collectProviderUsageWindows(usage)
   const staleUsageError = usage?.status === 'error' ? (usage.error ?? null) : null
 
   return (
@@ -347,7 +357,7 @@ export function ZcodePlanAccountsSection(): React.JSX.Element {
         >
           <div className="space-y-1">
             {usageWindows.map((row) => (
-              <ZcodeUsageWindowView key={row.kind} row={row} now={now} />
+              <ProviderUsageWindowView key={row.kind} row={row} now={now} labels={WINDOW_LABELS} />
             ))}
             {usage?.planType ? (
               <p className="text-xs text-muted-foreground">
