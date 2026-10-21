@@ -9,6 +9,8 @@ import {
   getAccountsZcodePlanSearchEntries
 } from './accounts-search'
 import { getAccountsCommandCodeSearchEntries } from './accounts-command-code-search'
+import type { UsageCredentialHost } from './usage-credential-host'
+import type { UsageHostSettingsModel } from './use-usage-host-settings'
 
 /**
  * Sections whose credential lives in the provider's own CLI or desktop files
@@ -16,7 +18,10 @@ import { getAccountsCommandCodeSearchEntries } from './accounts-command-code-sea
  * AccountsPane and a new provider cannot drift out of the settings search.
  */
 export function renderCredentialBackedAccountsSections(
-  searchQuery: string
+  searchQuery: string,
+  host: UsageCredentialHost,
+  usageSettings: UsageHostSettingsModel,
+  accountOwnerKey: string
 ): (React.JSX.Element | null)[] {
   return [
     matchesSettingsSearch(searchQuery, getAccountsGrokSearchEntries()) ? (
@@ -26,7 +31,11 @@ export function renderCredentialBackedAccountsSections(
       <CursorAccountsSection key="cursor" />
     ) : null,
     matchesSettingsSearch(searchQuery, getAccountsZcodePlanSearchEntries()) ? (
-      <ZcodePlanAccountsSection key="zcode" />
+      <ZcodePlanAccountsSection
+        key={`zcode:${accountOwnerKey}`}
+        host={host}
+        usageSettings={usageSettings}
+      />
     ) : null,
     matchesSettingsSearch(searchQuery, getAccountsCommandCodeSearchEntries()) ? (
       <CommandCodeAccountsSection key="command-code" />

@@ -1,4 +1,3 @@
-import type { SecretAtRestProtection } from '../../../../shared/secret-at-rest-protection'
 import { useEffect, useRef, useState } from 'react'
 import type {
   ClaudeRateLimitAccountsState,
@@ -57,7 +56,6 @@ import {
   createClaudeAccountActionRunner,
   createCodexAccountActionRunner
 } from './accounts-pane-account-actions'
-import { createMiniMaxCredentialActions } from './accounts-pane-minimax-actions'
 import { renderAccountsLocationSection } from './accounts-pane-location-section'
 import { renderClaudeAccountsSection } from './accounts-pane-claude-section'
 import { renderCodexAccountsSection } from './accounts-pane-codex-section'
@@ -65,7 +63,8 @@ import {
   renderGeminiAccountsSection,
   renderOpenCodeAccountsSection
 } from './accounts-pane-provider-setting-sections'
-import { renderMiniMaxAccountsSection } from './accounts-pane-minimax-section'
+import { MiniMaxAccountsSection } from './MiniMaxAccountsSection'
+import { useUsageHostSettings } from './use-usage-host-settings'
 import { ManagedDataAccountsSection } from './ManagedDataAccountsSection'
 import { renderAccountsRemovalDialogs } from './accounts-pane-removal-dialogs'
 
@@ -92,15 +91,6 @@ export function AccountsPane({
   const recordedOpenCodeSettingEditsRef = useRef<Set<'cookie' | 'workspaceId' | 'apiKey'>>(
     new Set()
   )
-  const [miniMaxCookieDraft, setMiniMaxCookieDraft] = useState('')
-  const [miniMaxApiKeyDraft, setMiniMaxApiKeyDraft] = useState('')
-  const [miniMaxApiKeyConfigured, setMiniMaxApiKeyConfigured] = useState(false)
-  const [miniMaxApiKeyProtection, setMiniMaxApiKeyProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxConfigured, setMiniMaxConfigured] = useState(false)
-  const [miniMaxCookieProtection, setMiniMaxCookieProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxCredentialBusy, setMiniMaxCredentialBusy] = useState(false)
   const localAccountRuntime = getSelectedAccountRuntime(
     settings,
     wslSupportedPlatform,
@@ -241,34 +231,14 @@ export function AccountsPane({
     recordedOpenCodeSettingEditsRef.current.add(field)
     recordFeatureInteraction('usage-tracking')
   }
-  const refreshMiniMaxCredentialStatus = async (): Promise<void> => {
-    try {
-      const status = await window.api.minimaxCredentials.getStatus()
-      setMiniMaxConfigured(status.cookieConfigured)
-      setMiniMaxApiKeyConfigured(status.apiKeyConfigured)
-      setMiniMaxCookieProtection(status.cookieProtection)
-      setMiniMaxApiKeyProtection(status.apiKeyProtection)
-    } catch (error) {
-      console.error('Failed to load MiniMax credential status:', error)
-    }
-  }
-  const { saveMiniMaxCookie, clearMiniMaxCookie, saveMiniMaxApiKey, clearMiniMaxApiKey } =
-    createMiniMaxCredentialActions({
-      miniMaxCookieDraft,
-      setMiniMaxCookieDraft,
-      miniMaxApiKeyDraft,
-      setMiniMaxApiKeyDraft,
-      setMiniMaxApiKeyConfigured,
-      setMiniMaxApiKeyProtection,
-      setMiniMaxConfigured,
-      setMiniMaxCookieProtection,
-      setMiniMaxCredentialBusy,
-      recordFeatureInteraction
-    })
-
-  useEffect(() => {
-    void refreshMiniMaxCredentialStatus()
-  }, [])
+  // Why: MiniMax/GLM keys are read by the selected host's own usage poller, so they live there too.
+  const usageCredentialHost = { owner: accountOwner, label: remoteServerLabel }
+  const usageHostSettings = useUsageHostSettings(
+    accountOwner,
+    remoteServerLabel,
+    settings,
+    updateSettings
+  )
 
   useEffect(() => {
     const owner: RuntimeClientTarget = scopeEnvironmentId
@@ -368,21 +338,7 @@ export function AccountsPane({
     codexRateLimitTarget,
     setRemoveCodexTarget,
     runCodexAccountAction,
-    recordOpenCodeSettingEdit,
-    miniMaxRateLimits,
-    miniMaxApiKeyDraft,
-    setMiniMaxApiKeyDraft,
-    miniMaxApiKeyConfigured,
-    miniMaxApiKeyProtection,
-    saveMiniMaxApiKey,
-    clearMiniMaxApiKey,
-    miniMaxCookieDraft,
-    setMiniMaxCookieDraft,
-    miniMaxConfigured,
-    miniMaxCookieProtection,
-    miniMaxCredentialBusy,
-    saveMiniMaxCookie,
-    clearMiniMaxCookie
+    recordOpenCodeSettingEdit
   }
   const visibleSections = [
     !searchQuery || /opencode|devin|account/i.test(searchQuery) ? (
@@ -417,10 +373,21 @@ export function AccountsPane({
     matchesSettingsSearch(searchQuery, getAccountsOpencodeSearchEntries())
       ? renderOpenCodeAccountsSection(model)
       : null,
-    matchesSettingsSearch(searchQuery, getAccountsMiniMaxSearchEntries())
-      ? renderMiniMaxAccountsSection(model)
-      : null,
-    ...renderCredentialBackedAccountsSections(searchQuery)
+    matchesSettingsSearch(searchQuery, getAccountsMiniMaxSearchEntries()) ? (
+      <MiniMaxAccountsSection
+        key={`minimax:${accountOwnerKey}`}
+        host={usageCredentialHost}
+        usageSettings={usageHostSettings}
+        miniMaxRateLimits={isRemoteAccountScope ? null : miniMaxRateLimits}
+        recordFeatureInteraction={recordFeatureInteraction}
+      />
+    ) : null,
+    ...renderCredentialBackedAccountsSections(
+      searchQuery,
+      usageCredentialHost,
+      usageHostSettings,
+      accountOwnerKey
+    )
   ]
 
   return (

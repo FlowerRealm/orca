@@ -3,6 +3,11 @@ import type { ResolvedWorktree } from '../runtime-worktree-path-identity'
 import { splitWorktreeIdForFilesystem, worktreeIdentityKey } from '../../../shared/worktree/id'
 import { branchSelectorMatches, runtimePathsEqual } from '../runtime-worktree-path-identity'
 import { getRepoExecutionHostId, getWorktreeExecutionHostId } from '../../../shared/execution-host'
+import {
+  runtimeRepoSelectorHostId,
+  runtimeRepoSelectorText,
+  type RuntimeRepoSelector
+} from '../runtime-repo-selector'
 import type {
   WorktreeLineageInput,
   WorktreeLineageResolution
@@ -15,7 +20,7 @@ import type { Repo } from '../../../shared/repo-types'
 import type { RuntimeStore } from '../runtime-store-contract'
 import type { RuntimeWorkspaceCatalog } from './workspace-catalog'
 import { areWorktreePathsEqual } from '../../git/worktree-path-comparison'
-import { mergeWorktree } from '../../ipc/worktree-logic'
+import { mergeWorktree } from '../../ipc/worktree-metadata-merge'
 
 export abstract class RuntimeWorkspaceSelectors extends OrcaRuntimeWithResolveBrowserNetworkExecutionHostForWorktree {
   protected abstract hasFreshResolvedWorktreeCache(
@@ -172,11 +177,15 @@ export abstract class RuntimeWorkspaceSelectors extends OrcaRuntimeWithResolveBr
     )
   }
 
-  protected async resolveRepoSelector(selector: string): Promise<Repo> {
+  protected async resolveRepoSelector(selector: RuntimeRepoSelector): Promise<Repo> {
     if (!this.store) {
       throw new Error('repo_not_found')
     }
-    const candidates = this.selectReposBySelector(selector)
+    const matches = this.selectReposBySelector(runtimeRepoSelectorText(selector))
+    const hostId = runtimeRepoSelectorHostId(selector)
+    const candidates = hostId
+      ? matches.filter((repo) => getRepoExecutionHostId(repo) === hostId)
+      : matches
 
     if (candidates.length === 1) {
       return candidates[0]
